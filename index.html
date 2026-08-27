@@ -105,6 +105,12 @@ body{
 }
 
 
+#volumeControl input{
+
+    vertical-align:middle;
+}
+
+
 /* =====================================================
    WELCOME
 ===================================================== */
@@ -675,6 +681,7 @@ body{
             scale(1);
 
     }
+
 }
 
 
@@ -1076,11 +1083,6 @@ body{
     </div>
 
 
-    <!--
-        Từ tiếng Anh xuất hiện ở đây.
-        Đồng thời recording/word.mp3 sẽ phát.
-    -->
-
     <div id="targetArea">
 
         <div id="targetWord">
@@ -1097,8 +1099,6 @@ body{
     </div>
 
 
-    <!-- 9 LỖ -->
-
     <div id="gameBoard"></div>
 
 
@@ -1110,7 +1110,7 @@ body{
 
 
 <!-- =====================================================
-     END SCREEN
+   END SCREEN
 ===================================================== -->
 
 <div id="endScreen">
@@ -1194,27 +1194,13 @@ const RECORDING_FOLDER =
    CẤU HÌNH
 ===================================================== */
 
-
-/*
-    Thời gian đập chuột:
-    2,5 giây
-*/
-
 const HIT_TIME =
     2500;
 
 
-/*
-    Mỗi round có 3 chuột.
-*/
-
 const MOLE_COUNT =
     3;
 
-
-/*
-    Mỗi từ chỉ làm đáp án 1 lần.
-*/
 
 const TOTAL_ROUNDS =
     juniorword.length;
@@ -1242,17 +1228,17 @@ let roundTimer = null;
 
 let timerAnimation = null;
 
-
-/*
-    Audio của từ vựng.
-*/
-
 let wordAudio = null;
 
 
 /*
-    Cho biết người chơi đã đập đúng
-    trong round hiện tại chưa.
+    QUAN TRỌNG:
+
+    Mỗi round chỉ được phép đập
+    đúng 1 lần.
+
+    Đúng  -> kết thúc round.
+    Sai   -> kết thúc round.
 */
 
 let roundFinished = false;
@@ -1376,29 +1362,44 @@ const bgMusic =
 
 
 /*
-    Mặc định âm lượng = 0.
+    Âm lượng mặc định = 0.
 */
 
 bgMusic.volume = 0;
 
+
+/*
+    Khi người dùng click lần đầu,
+    trình duyệt cho phép audio phát.
+
+    Tuy nhiên volume vẫn giữ 0.
+*/
 
 document.body.addEventListener(
     "click",
     () => {
 
         bgMusic.volume =
-            document.getElementById(
-                "bgVolume"
-            ).value;
+            Number(
+                document.getElementById(
+                    "bgVolume"
+                ).value
+            );
 
         bgMusic.play().catch(
             () => {}
         );
 
     },
-    { once:true }
+    {
+        once:true
+    }
 );
 
+
+/*
+    Điều chỉnh âm lượng.
+*/
 
 document
     .getElementById("bgVolume")
@@ -1407,13 +1408,10 @@ document
         function(){
 
             bgMusic.volume =
-                this.value;
+                Number(
+                    this.value
+                );
 
-
-            /*
-                Nếu người dùng kéo
-                âm lượng lên thì phát nhạc.
-            */
 
             if(
                 Number(this.value) > 0
@@ -1435,8 +1433,7 @@ document
 
 
 /*
-    Lưu đường dẫn ảnh thực tế
-    đã tải thành công.
+    Lưu đường dẫn ảnh đã tìm thấy.
 
     Ví dụ:
 
@@ -1451,12 +1448,10 @@ const imageSources = {};
 /*
     Tải một ảnh.
 
-    Thứ tự:
+    Thử lần lượt:
 
     PNG
-    ↓
     JPG
-    ↓
     JPEG
 */
 
@@ -1466,9 +1461,11 @@ function preloadOneImage(word){
         resolve => {
 
             const extensions = [
+
                 "png",
                 "jpg",
                 "jpeg"
+
             ];
 
 
@@ -1476,10 +1473,6 @@ function preloadOneImage(word){
 
 
             function tryNext(){
-
-                /*
-                    Đã thử hết 3 loại.
-                */
 
                 if(
                     currentIndex >=
@@ -1514,9 +1507,16 @@ function preloadOneImage(word){
                     function(){
 
                         /*
-                            Ghi nhớ đường dẫn
-                            ảnh đã tải thành công.
+                            Giữ chính Image object
+                            trong bộ nhớ.
+
+                            Điều này giúp trình duyệt
+                            đã decode ảnh trước khi chơi.
                         */
+
+                        imgSources[word] =
+                            img;
+
 
                         imageSources[word] =
                             src;
@@ -1537,11 +1537,8 @@ function preloadOneImage(word){
                     };
 
 
-                /*
-                    Bắt đầu tải ảnh.
-                */
-
-                img.src = src;
+                img.src =
+                    src;
 
             }
 
@@ -1555,7 +1552,9 @@ function preloadOneImage(word){
 
 
 /*
-    Preload toàn bộ ảnh.
+    Tải toàn bộ ảnh.
+
+    Tất cả ảnh được tải song song.
 */
 
 async function preloadAllImages(){
@@ -1564,7 +1563,8 @@ async function preloadAllImages(){
         juniorword.length;
 
 
-    let loaded = 0;
+    let completed =
+        0;
 
 
     loadingStatus.textContent =
@@ -1576,50 +1576,62 @@ async function preloadAllImages(){
 
 
     /*
-        Tải song song tất cả ảnh.
-
-        Cách này nhanh hơn tải
-        từng ảnh một.
+        Tạo promise riêng để cập nhật
+        tiến trình ngay khi từng ảnh xong.
     */
 
-    const results =
-        await Promise.all(
-            juniorword.map(
-                word =>
-                    preloadOneImage(word)
-            )
+    const promises =
+        juniorword.map(
+            async word => {
+
+                const result =
+                    await preloadOneImage(
+                        word
+                    );
+
+
+                completed++;
+
+
+                const percent =
+                    completed /
+                    total *
+                    100;
+
+
+                loadingProgress.style.width =
+                    percent + "%";
+
+
+                loadingStatus.textContent =
+                    `🖼️ Đang tải hình ảnh... ${completed}/${total}`;
+
+
+                return result;
+
+            }
         );
 
 
-    /*
-        Đếm số ảnh tải thành công.
-    */
-
-    results.forEach(
-        result => {
-
-            if(result)
-                loaded++;
-
-        }
-    );
+    const results =
+        await Promise.all(
+            promises
+        );
 
 
-    /*
-        Cập nhật thanh tiến trình.
-    */
+    const loaded =
+        results.filter(
+            result => result
+        ).length;
 
-    loadingProgress.style.width =
-        "100%";
-
-
-    /*
-        Nếu tất cả ảnh đều tồn tại.
-    */
 
     if(
         loaded === total
     ){
+
+        loadingProgress.style.width =
+            "100%";
+
 
         loadingStatus.textContent =
             `✅ Đã tải xong ${total}/${total} hình ảnh!`;
@@ -1633,11 +1645,6 @@ async function preloadAllImages(){
             "🔨 Bắt đầu";
 
     }
-
-
-    /*
-        Nếu có ảnh bị thiếu.
-    */
 
     else{
 
@@ -1655,6 +1662,27 @@ async function preloadAllImages(){
     }
 
 }
+
+
+/* =====================================================
+   IMAGE CACHE
+===================================================== */
+
+
+/*
+    Giữ Image object trong RAM.
+
+    Điều này quan trọng hơn chỉ preload
+    bằng src.
+
+    Sau khi preload:
+
+    imgSources["doctor"]
+
+    chính là Image object đã load.
+*/
+
+const imgSources = {};
 
 
 /* =====================================================
@@ -1686,6 +1714,7 @@ function shuffle(arr){
         ];
 
     }
+
 
     return arr;
 
@@ -1760,7 +1789,7 @@ function createBoard(){
 
 
 /* =====================================================
-   RANDOM WORD FOR WRONG MOLES
+   RANDOM WORD
 ===================================================== */
 
 function randomWord(){
@@ -1781,28 +1810,15 @@ function randomWord(){
 
 function playWordAudio(word){
 
-    /*
-        Dừng audio cũ nếu có.
-    */
-
     if(wordAudio){
 
         wordAudio.pause();
 
-        wordAudio.currentTime = 0;
+        wordAudio.currentTime =
+            0;
 
     }
 
-
-    /*
-        Tạo audio mới.
-
-        Ví dụ:
-
-        recording/doctor.mp3
-        recording/farmer.mp3
-        recording/nurse.mp3
-    */
 
     wordAudio =
         new Audio(
@@ -1815,10 +1831,6 @@ function playWordAudio(word){
     wordAudio.preload =
         "auto";
 
-
-    /*
-        Phát audio.
-    */
 
     wordAudio.play().catch(
         () => {}
@@ -1841,8 +1853,7 @@ function createRound(){
 
 
     /*
-        Nếu hết từ:
-        kết thúc game.
+        Hết từ -> kết thúc.
     */
 
     if(
@@ -1857,11 +1868,16 @@ function createRound(){
 
 
     /*
-        Reset.
+        Reset trạng thái round.
     */
 
-    roundFinished = false;
+    roundFinished =
+        false;
 
+
+    /*
+        Xóa tất cả chuột cũ.
+    */
 
     for(
         let i = 0;
@@ -1880,22 +1896,15 @@ function createRound(){
 
 
     /*
-        LẤY TỪ TIẾP THEO.
+        Lấy từ tiếp theo.
 
-        shift() đồng thời xóa từ
-        khỏi remainingWords.
-
-        Vì vậy từ này sẽ không
-        xuất hiện lại làm đáp án.
+        Mỗi từ chỉ xuất hiện 1 lần
+        làm đáp án.
     */
 
     currentTarget =
         remainingWords.shift();
 
-
-    /*
-        Hiện từ.
-    */
 
     targetWordEl.textContent =
         currentTarget;
@@ -1910,13 +1919,12 @@ function createRound(){
 
 
     /*
-        Phát file recording.
+        Phát recording.
     */
 
-    const audio =
-        playWordAudio(
-            currentTarget
-        );
+    playWordAudio(
+        currentTarget
+    );
 
 
     /*
@@ -1933,7 +1941,7 @@ function createRound(){
 
 
     /*
-        Một trong 3 vị trí là đáp án.
+        Chọn vị trí đúng.
     */
 
     const correctPosition =
@@ -1945,24 +1953,16 @@ function createRound(){
         ];
 
 
-    /* =================================================
-       TẠO 3 CHUỘT
-       
-       QUAN TRỌNG:
+    /*
+        Set chống trùng.
 
-       usedWords dùng Set để đảm bảo
-       3 hình trong cùng round
-       không bao giờ trùng nhau.
-    ================================================= */
+        Vì có 14 từ và chỉ lấy 3
+        nên luôn đủ từ khác nhau.
+    */
 
     const usedWords =
         new Set();
 
-
-    /*
-        Đáp án đúng được đưa vào
-        danh sách đã sử dụng trước.
-    */
 
     usedWords.add(
         currentTarget
@@ -1995,14 +1995,6 @@ function createRound(){
 
             else{
 
-                /*
-                    Chọn từ mới.
-
-                    Không được:
-                    - trùng đáp án
-                    - trùng chuột sai trước đó
-                */
-
                 do{
 
                     word =
@@ -2015,10 +2007,6 @@ function createRound(){
 
             }
 
-
-            /*
-                Ghi nhớ từ đã sử dụng.
-            */
 
             usedWords.add(
                 word
@@ -2035,7 +2023,7 @@ function createRound(){
 
 
     /*
-        Bắt đầu timer 2,5 giây.
+        Bắt đầu timer.
     */
 
     startHitTimer();
@@ -2080,33 +2068,70 @@ function showMole(
 
 
     /*
-        Sử dụng chính ảnh đã preload.
+        Lấy Image object đã preload.
 
-        Nếu preload tìm thấy PNG
-        thì dùng PNG.
-
-        Nếu không có PNG nhưng có
-        JPG/JPEG thì dùng ảnh đó.
+        Đây là điểm quan trọng giúp
+        ảnh hiện gần như ngay lập tức.
     */
 
-    const imageSrc =
-        imageSources[word];
+    const cachedImage =
+        imgSources[word];
 
 
-    /*
-        Chỉ hiện hình.
-        KHÔNG hiện chữ dưới chuột.
-    */
+    if(
+        cachedImage
+    ){
 
-    mole.innerHTML = `
+        /*
+            Clone Image object.
 
-        <img
-            src="${imageSrc}"
-            alt="${word}"
-            draggable="false"
-        >
+            Không cần tải lại từ server.
+        */
 
-    `;
+        const img =
+            cachedImage.cloneNode(
+                true
+            );
+
+
+        img.alt =
+            word;
+
+
+        img.draggable =
+            false;
+
+
+        mole.innerHTML = "";
+
+
+        mole.appendChild(
+            img
+        );
+
+    }
+
+    else{
+
+        /*
+            Fallback nếu có lỗi.
+        */
+
+        const imageSrc =
+            imageSources[word];
+
+
+        mole.innerHTML = `
+
+            <img
+                src="${imageSrc}"
+                alt="${word}"
+                draggable="false"
+            >
+
+        `;
+
+    }
 
 
     hole.classList.add(
@@ -2155,7 +2180,7 @@ function hideMole(index){
 
 
 /* =====================================================
-   2.5 SECOND HIT TIMER
+   HIT TIMER
 ===================================================== */
 
 function startHitTimer(){
@@ -2225,11 +2250,6 @@ function startHitTimer(){
         );
 
 
-    /*
-        Sau 2,5 giây:
-        hết quyền đập lấy điểm.
-    */
-
     roundTimer =
         setTimeout(
             hitTimeUp,
@@ -2240,7 +2260,7 @@ function startHitTimer(){
 
 
 /* =====================================================
-   HẾT 2.5 GIÂY
+   HẾT GIỜ
 ===================================================== */
 
 function hitTimeUp(){
@@ -2256,10 +2276,11 @@ function hitTimeUp(){
 
 
     /*
-        Hết thời gian đập.
+        Hết lượt.
     */
 
-    roundFinished = true;
+    roundFinished =
+        true;
 
 
     clearTimeout(
@@ -2285,7 +2306,7 @@ function hitTimeUp(){
 
 
     /*
-        Ẩn chuột.
+        Ẩn tất cả chuột.
     */
 
     activeHoles.forEach(
@@ -2298,10 +2319,7 @@ function hitTimeUp(){
 
 
     /*
-        Nếu audio vẫn đang phát,
-        không chuyển round ngay.
-
-        Chờ audio kết thúc.
+        Chờ recording xong.
     */
 
     waitForAudioThenNextRound();
@@ -2310,7 +2328,7 @@ function hitTimeUp(){
 
 
 /* =====================================================
-   CHỜ AUDIO XONG RỒI MỚI SANG ROUND
+   WAIT AUDIO
 ===================================================== */
 
 function waitForAudioThenNextRound(){
@@ -2320,7 +2338,8 @@ function waitForAudioThenNextRound(){
 
 
     /*
-        Không có audio hoặc audio đã kết thúc.
+        Nếu audio không tồn tại
+        hoặc đã phát xong.
     */
 
     if(
@@ -2336,8 +2355,7 @@ function waitForAudioThenNextRound(){
 
 
     /*
-        Nếu audio còn phát,
-        chờ event "ended".
+        Chờ audio kết thúc.
     */
 
     wordAudio.addEventListener(
@@ -2373,7 +2391,8 @@ function goToNextRound(){
 
 
     if(
-        currentRound >= TOTAL_ROUNDS
+        currentRound >=
+        TOTAL_ROUNDS
     ){
 
         endGame();
@@ -2402,8 +2421,14 @@ function hitMole(event){
 
 
     /*
-        Nếu round đã kết thúc
-        thì không cho đập.
+        QUAN TRỌNG NHẤT:
+
+        Nếu lượt này đã được đập
+        rồi thì không cho đập nữa.
+
+        Áp dụng cho cả:
+        - đúng
+        - sai
     */
 
     if(roundFinished)
@@ -2430,11 +2455,12 @@ function hitMole(event){
 
 
     /*
-        Chuột đã bị đập.
+        Chuột này đã bị đập.
     */
 
     if(
-        hole.dataset.hit === "true"
+        hole.dataset.hit ===
+        "true"
     ){
 
         return;
@@ -2453,7 +2479,7 @@ function hitMole(event){
 
 
     /*
-        Đánh dấu đã đập.
+        Đánh dấu chuột đã bị đập.
     */
 
     hole.dataset.hit =
@@ -2461,7 +2487,7 @@ function hitMole(event){
 
 
     /*
-        Hiện búa.
+        HIỆN BÚA.
     */
 
     showHammer(
@@ -2479,7 +2505,18 @@ function hitMole(event){
     ){
 
         /*
-            +1 điểm
+            Khóa lượt ngay lập tức.
+
+            Người chơi không thể đập
+            chuột khác.
+        */
+
+        roundFinished =
+            true;
+
+
+        /*
+            +1 điểm.
         */
 
         score++;
@@ -2496,22 +2533,17 @@ function hitMole(event){
             "#bbf7d0";
 
 
+        /*
+            Âm thanh đúng.
+        */
+
         playSound(
             "correct"
         );
 
 
         /*
-            Round hoàn thành.
-
-            Không cho đập thêm.
-        */
-
-        roundFinished = true;
-
-
-        /*
-            Dừng timer 2,5 giây.
+            Dừng timer.
         */
 
         clearTimeout(
@@ -2529,7 +2561,7 @@ function hitMole(event){
 
 
         /*
-            Hiệu ứng chuột bị đập.
+            Hiệu ứng chuột đúng.
         */
 
         hole.classList.add(
@@ -2538,7 +2570,8 @@ function hitMole(event){
 
 
         /*
-            Ẩn chuột.
+            Sau hiệu ứng:
+            ẩn tất cả chuột.
         */
 
         setTimeout(
@@ -2560,12 +2593,7 @@ function hitMole(event){
 
 
         /*
-            Đập đúng rồi nhưng nếu
-            recording còn phát thì
-            phải chờ recording xong.
-
-            Nếu recording đã xong thì
-            chuyển ngay.
+            Chờ recording xong.
         */
 
         waitForAudioThenNextRound();
@@ -2579,6 +2607,42 @@ function hitMole(event){
 
     else{
 
+        /*
+            =================================================
+            QUAN TRỌNG:
+
+            ĐẬP SAI = KHÓA NGAY LẬP TỨC.
+
+            Không được đập tiếp chuột nào khác.
+        =================================================
+        */
+
+        roundFinished =
+            true;
+
+
+        /*
+            Dừng timer.
+        */
+
+        clearTimeout(
+            roundTimer
+        );
+
+
+        cancelAnimationFrame(
+            timerAnimation
+        );
+
+
+        timerProgress.style.width =
+            "0%";
+
+
+        /*
+            Thông báo.
+        */
+
         messageEl.textContent =
             "❌ Sai rồi!";
 
@@ -2587,13 +2651,17 @@ function hitMole(event){
             "#fecaca";
 
 
+        /*
+            Âm thanh sai.
+        */
+
         playSound(
             "wrong"
         );
 
 
         /*
-            Chỉ chuột sai biến mất.
+            Hiệu ứng chuột sai.
         */
 
         hole.classList.add(
@@ -2601,14 +2669,36 @@ function hitMole(event){
         );
 
 
+        /*
+            Ẩn TẤT CẢ chuột.
+
+            Không chỉ chuột sai.
+        */
+
         setTimeout(
             () => {
 
-                hideMole(index);
+                for(
+                    let i = 0;
+                    i < 9;
+                    i++
+                ){
+
+                    hideMole(i);
+
+                }
 
             },
             180
         );
+
+
+        /*
+            Chờ recording xong rồi
+            chuyển sang lượt tiếp theo.
+        */
+
+        waitForAudioThenNextRound();
 
     }
 
@@ -2675,7 +2765,8 @@ function updateScore(){
    CORRECT / WRONG SOUND
 ===================================================== */
 
-let audioContext = null;
+let audioContext =
+    null;
 
 
 function playSound(type){
@@ -2693,6 +2784,21 @@ function playSound(type){
         }
 
 
+        /*
+            Một số điện thoại cần resume
+            AudioContext sau user interaction.
+        */
+
+        if(
+            audioContext.state ===
+            "suspended"
+        ){
+
+            audioContext.resume();
+
+        }
+
+
         const osc =
             audioContext.createOscillator();
 
@@ -2701,12 +2807,19 @@ function playSound(type){
             audioContext.createGain();
 
 
-        osc.connect(gain);
+        osc.connect(
+            gain
+        );
+
 
         gain.connect(
             audioContext.destination
         );
 
+
+        /* =================================================
+           CORRECT
+        ================================================= */
 
         if(
             type === "correct"
@@ -2744,10 +2857,16 @@ function playSound(type){
 
 
             osc.stop(
-                audioContext.currentTime + 0.15
+                audioContext.currentTime +
+                0.15
             );
 
         }
+
+
+        /* =================================================
+           WRONG
+        ================================================= */
 
         else{
 
@@ -2767,7 +2886,8 @@ function playSound(type){
 
 
             osc.stop(
-                audioContext.currentTime + 0.2
+                audioContext.currentTime +
+                0.2
             );
 
         }
@@ -2789,7 +2909,7 @@ startBtn.addEventListener(
 
         /*
             Không cho bắt đầu nếu
-            hình ảnh chưa tải xong.
+            ảnh chưa tải xong.
         */
 
         if(
@@ -2823,8 +2943,7 @@ startBtn.addEventListener(
         /*
             Xáo trộn toàn bộ từ.
 
-            Mỗi từ chỉ được lấy 1 lần
-            làm đáp án.
+            Mỗi từ chỉ làm đáp án 1 lần.
         */
 
         remainingWords =
@@ -2833,26 +2952,36 @@ startBtn.addEventListener(
             );
 
 
-        score = 0;
+        score =
+            0;
 
-        currentRound = 0;
 
-        currentTarget = "";
+        currentRound =
+            0;
 
-        gameRunning = true;
 
-        roundFinished = false;
+        currentTarget =
+            "";
+
+
+        gameRunning =
+            true;
+
+
+        roundFinished =
+            false;
 
 
         /*
-            Dừng audio cũ nếu có.
+            Dừng audio cũ.
         */
 
         if(wordAudio){
 
             wordAudio.pause();
 
-            wordAudio.currentTime = 0;
+            wordAudio.currentTime =
+                0;
 
         }
 
@@ -2883,7 +3012,12 @@ startBtn.addEventListener(
 
 function endGame(){
 
-    gameRunning = false;
+    gameRunning =
+        false;
+
+
+    roundFinished =
+        true;
 
 
     clearTimeout(
@@ -2904,7 +3038,8 @@ function endGame(){
 
         wordAudio.pause();
 
-        wordAudio.currentTime = 0;
+        wordAudio.currentTime =
+            0;
 
     }
 
@@ -2957,7 +3092,8 @@ playAgainBtn.addEventListener(
 
             wordAudio.pause();
 
-            wordAudio.currentTime = 0;
+            wordAudio.currentTime =
+                0;
 
         }
 
@@ -2971,9 +3107,7 @@ playAgainBtn.addEventListener(
 
 
         /*
-            Giữ nguyên tên học sinh.
-
-            Không cần nhập lại tên.
+            Giữ tên học sinh.
         */
 
         nameInput.value =
@@ -2984,7 +3118,30 @@ playAgainBtn.addEventListener(
             "";
 
 
-        remainingWords = [];
+        remainingWords =
+            [];
+
+
+        /*
+            Không preload lại ảnh.
+
+            Ảnh đã nằm trong cache.
+        */
+
+        loadingStatus.textContent =
+            `✅ Đã tải xong ${juniorword.length}/${juniorword.length} hình ảnh!`;
+
+
+        loadingProgress.style.width =
+            "100%";
+
+
+        startBtn.disabled =
+            false;
+
+
+        startBtn.textContent =
+            "🔨 Bắt đầu";
 
     }
 );
@@ -3073,7 +3230,8 @@ function animateBalloons(){
     balloons.forEach(
         (b,i) => {
 
-            b.y -= b.speed;
+            b.y -=
+                b.speed;
 
 
             ctx.beginPath();
@@ -3170,7 +3328,7 @@ document.addEventListener(
 
 
         /*
-            Bắt đầu preload ảnh.
+            Bắt đầu preload toàn bộ ảnh.
         */
 
         preloadAllImages();
