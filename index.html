@@ -2,10 +2,16 @@
 <html lang="vi">
 
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, user-scalable=no"
+>
 
 <title>JUNI English - Whack a Mole</title>
+
 
 <style>
 
@@ -164,6 +170,72 @@ body{
 }
 
 
+/* =====================================================
+   LOADING STATUS
+===================================================== */
+
+#loadingStatus{
+
+    width:280px;
+
+    text-align:center;
+
+    font-size:18px;
+
+    font-weight:bold;
+
+    color:#1f2937;
+
+    margin-bottom:15px;
+
+    min-height:27px;
+}
+
+
+#loadingBar{
+
+    width:280px;
+
+    height:12px;
+
+    background:
+        rgba(255,255,255,0.6);
+
+    border-radius:20px;
+
+    overflow:hidden;
+
+    margin-bottom:20px;
+
+    box-shadow:
+        inset 0 1px 3px rgba(0,0,0,0.2);
+}
+
+
+#loadingProgress{
+
+    width:0%;
+
+    height:100%;
+
+    background:
+        linear-gradient(
+            90deg,
+            #22c55e,
+            #16a34a
+        );
+
+    border-radius:20px;
+
+    transition:
+        width 0.2s ease;
+}
+
+
+/* =====================================================
+   START BUTTON
+===================================================== */
+
 #welcomeScreen button{
 
     padding:15px 40px;
@@ -200,6 +272,26 @@ body{
 
     box-shadow:
         0 8px 20px rgba(0,0,0,0.4);
+}
+
+
+/* =====================================================
+   DISABLED START BUTTON
+===================================================== */
+
+#welcomeScreen button:disabled{
+
+    background:#9ca3af;
+
+    color:#e5e7eb;
+
+    cursor:not-allowed;
+
+    transform:none;
+
+    box-shadow:
+        0 3px 8px rgba(0,0,0,0.2);
+
 }
 
 
@@ -813,6 +905,20 @@ body{
         width:70%;
     }
 
+
+    #loadingStatus{
+
+        width:70%;
+
+        font-size:16px;
+    }
+
+
+    #loadingBar{
+
+        width:70%;
+    }
+
 }
 
 
@@ -932,8 +1038,27 @@ body{
     >
 
 
-    <button id="startBtn">
-        🔨 Bắt đầu
+    <!-- =================================================
+         LOADING
+    ================================================= -->
+
+    <div id="loadingStatus">
+        🖼️ Đang chuẩn bị hình ảnh...
+    </div>
+
+
+    <div id="loadingBar">
+
+        <div id="loadingProgress"></div>
+
+    </div>
+
+
+    <button
+        id="startBtn"
+        disabled
+    >
+        ⏳ Đang tải...
     </button>
 
 </div>
@@ -1033,7 +1158,24 @@ body{
    DANH SÁCH TỪ VỰNG
 ===================================================== */
 
-const juniorword = ['doctor','farmer','fireman','housewife','mum','nurse','orange','pen','pilot','police','postman','pupil','teacher','zookeeper'];
+const juniorword = [
+
+    'doctor',
+    'farmer',
+    'fireman',
+    'housewife',
+    'mum',
+    'nurse',
+    'orange',
+    'pen',
+    'pilot',
+    'police',
+    'postman',
+    'pupil',
+    'teacher',
+    'zookeeper'
+
+];
 
 
 /* =====================================================
@@ -1145,6 +1287,18 @@ const nameInput =
     );
 
 
+const loadingStatus =
+    document.getElementById(
+        "loadingStatus"
+    );
+
+
+const loadingProgress =
+    document.getElementById(
+        "loadingProgress"
+    );
+
+
 const gameArea =
     document.getElementById(
         "gameArea"
@@ -1221,13 +1375,25 @@ const bgMusic =
     );
 
 
+/*
+    Mặc định âm lượng = 0.
+*/
+
+bgMusic.volume = 0;
+
+
 document.body.addEventListener(
     "click",
     () => {
 
-        bgMusic.volume = 0;
+        bgMusic.volume =
+            document.getElementById(
+                "bgVolume"
+            ).value;
 
-        bgMusic.play().catch(()=>{});
+        bgMusic.play().catch(
+            () => {}
+        );
 
     },
     { once:true }
@@ -1243,8 +1409,252 @@ document
             bgMusic.volume =
                 this.value;
 
+
+            /*
+                Nếu người dùng kéo
+                âm lượng lên thì phát nhạc.
+            */
+
+            if(
+                Number(this.value) > 0
+            ){
+
+                bgMusic.play().catch(
+                    () => {}
+                );
+
+            }
+
         }
     );
+
+
+/* =====================================================
+   PRELOAD IMAGES
+===================================================== */
+
+
+/*
+    Lưu đường dẫn ảnh thực tế
+    đã tải thành công.
+
+    Ví dụ:
+
+    imageSources["doctor"]
+    =
+    "flashcard/doctor.png"
+*/
+
+const imageSources = {};
+
+
+/*
+    Tải một ảnh.
+
+    Thứ tự:
+
+    PNG
+    ↓
+    JPG
+    ↓
+    JPEG
+*/
+
+function preloadOneImage(word){
+
+    return new Promise(
+        resolve => {
+
+            const extensions = [
+                "png",
+                "jpg",
+                "jpeg"
+            ];
+
+
+            let currentIndex = 0;
+
+
+            function tryNext(){
+
+                /*
+                    Đã thử hết 3 loại.
+                */
+
+                if(
+                    currentIndex >=
+                    extensions.length
+                ){
+
+                    resolve(false);
+
+                    return;
+
+                }
+
+
+                const extension =
+                    extensions[
+                        currentIndex
+                    ];
+
+
+                const src =
+                    IMAGE_FOLDER +
+                    word +
+                    "." +
+                    extension;
+
+
+                const img =
+                    new Image();
+
+
+                img.onload =
+                    function(){
+
+                        /*
+                            Ghi nhớ đường dẫn
+                            ảnh đã tải thành công.
+                        */
+
+                        imageSources[word] =
+                            src;
+
+
+                        resolve(true);
+
+                    };
+
+
+                img.onerror =
+                    function(){
+
+                        currentIndex++;
+
+                        tryNext();
+
+                    };
+
+
+                /*
+                    Bắt đầu tải ảnh.
+                */
+
+                img.src = src;
+
+            }
+
+
+            tryNext();
+
+        }
+    );
+
+}
+
+
+/*
+    Preload toàn bộ ảnh.
+*/
+
+async function preloadAllImages(){
+
+    const total =
+        juniorword.length;
+
+
+    let loaded = 0;
+
+
+    loadingStatus.textContent =
+        `🖼️ Đang tải hình ảnh... 0/${total}`;
+
+
+    loadingProgress.style.width =
+        "0%";
+
+
+    /*
+        Tải song song tất cả ảnh.
+
+        Cách này nhanh hơn tải
+        từng ảnh một.
+    */
+
+    const results =
+        await Promise.all(
+            juniorword.map(
+                word =>
+                    preloadOneImage(word)
+            )
+        );
+
+
+    /*
+        Đếm số ảnh tải thành công.
+    */
+
+    results.forEach(
+        result => {
+
+            if(result)
+                loaded++;
+
+        }
+    );
+
+
+    /*
+        Cập nhật thanh tiến trình.
+    */
+
+    loadingProgress.style.width =
+        "100%";
+
+
+    /*
+        Nếu tất cả ảnh đều tồn tại.
+    */
+
+    if(
+        loaded === total
+    ){
+
+        loadingStatus.textContent =
+            `✅ Đã tải xong ${total}/${total} hình ảnh!`;
+
+
+        startBtn.disabled =
+            false;
+
+
+        startBtn.textContent =
+            "🔨 Bắt đầu";
+
+    }
+
+
+    /*
+        Nếu có ảnh bị thiếu.
+    */
+
+    else{
+
+        loadingStatus.textContent =
+            `⚠️ Chỉ tải được ${loaded}/${total} hình ảnh.`;
+
+
+        startBtn.disabled =
+            true;
+
+
+        startBtn.textContent =
+            "⚠️ Thiếu hình ảnh";
+
+    }
+
+}
 
 
 /* =====================================================
@@ -1535,9 +1945,29 @@ function createRound(){
         ];
 
 
+    /* =================================================
+       TẠO 3 CHUỘT
+       
+       QUAN TRỌNG:
+
+       usedWords dùng Set để đảm bảo
+       3 hình trong cùng round
+       không bao giờ trùng nhau.
+    ================================================= */
+
+    const usedWords =
+        new Set();
+
+
     /*
-        Tạo 3 chuột.
+        Đáp án đúng được đưa vào
+        danh sách đã sử dụng trước.
     */
+
+    usedWords.add(
+        currentTarget
+    );
+
 
     positions.forEach(
         index => {
@@ -1565,25 +1995,34 @@ function createRound(){
 
             else{
 
-                word =
-                    randomWord();
-
-
                 /*
-                    Không cho chuột sai
-                    trùng đáp án hiện tại.
+                    Chọn từ mới.
+
+                    Không được:
+                    - trùng đáp án
+                    - trùng chuột sai trước đó
                 */
 
-                while(
-                    word === currentTarget
-                ){
+                do{
 
                     word =
                         randomWord();
 
                 }
+                while(
+                    usedWords.has(word)
+                );
 
             }
+
+
+            /*
+                Ghi nhớ từ đã sử dụng.
+            */
+
+            usedWords.add(
+                word
+            );
 
 
             showMole(
@@ -1641,6 +2080,20 @@ function showMole(
 
 
     /*
+        Sử dụng chính ảnh đã preload.
+
+        Nếu preload tìm thấy PNG
+        thì dùng PNG.
+
+        Nếu không có PNG nhưng có
+        JPG/JPEG thì dùng ảnh đó.
+    */
+
+    const imageSrc =
+        imageSources[word];
+
+
+    /*
         Chỉ hiện hình.
         KHÔNG hiện chữ dưới chuột.
     */
@@ -1648,45 +2101,12 @@ function showMole(
     mole.innerHTML = `
 
         <img
-            src="${IMAGE_FOLDER}${word}.png"
+            src="${imageSrc}"
             alt="${word}"
+            draggable="false"
         >
 
     `;
-
-
-    /*
-        PNG → JPG → JPEG
-    */
-
-    const img =
-        mole.querySelector(
-            "img"
-        );
-
-
-    img.onerror =
-        function(){
-
-            if(
-                this.src.endsWith(".png")
-            ){
-
-                this.src =
-                    `${IMAGE_FOLDER}${word}.jpg`;
-
-            }
-
-            else if(
-                this.src.endsWith(".jpg")
-            ){
-
-                this.src =
-                    `${IMAGE_FOLDER}${word}.jpeg`;
-
-            }
-
-        };
 
 
     hole.classList.add(
@@ -1878,10 +2298,8 @@ function hitTimeUp(){
 
 
     /*
-        QUAN TRỌNG:
-
         Nếu audio vẫn đang phát,
-        KHÔNG chuyển round ngay.
+        không chuyển round ngay.
 
         Chờ audio kết thúc.
     */
@@ -2142,8 +2560,6 @@ function hitMole(event){
 
 
         /*
-            QUAN TRỌNG:
-
             Đập đúng rồi nhưng nếu
             recording còn phát thì
             phải chờ recording xong.
@@ -2371,6 +2787,20 @@ startBtn.addEventListener(
     "click",
     () => {
 
+        /*
+            Không cho bắt đầu nếu
+            hình ảnh chưa tải xong.
+        */
+
+        if(
+            startBtn.disabled
+        ){
+
+            return;
+
+        }
+
+
         const name =
             nameInput.value.trim();
 
@@ -2540,8 +2970,14 @@ playAgainBtn.addEventListener(
             "flex";
 
 
+        /*
+            Giữ nguyên tên học sinh.
+
+            Không cần nhập lại tên.
+        */
+
         nameInput.value =
-            "";
+            studentName;
 
 
         gameBoard.innerHTML =
@@ -2731,6 +3167,13 @@ document.addEventListener(
 
         welcomeScreen.style.display =
             "flex";
+
+
+        /*
+            Bắt đầu preload ảnh.
+        */
+
+        preloadAllImages();
 
     }
 );
