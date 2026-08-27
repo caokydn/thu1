@@ -623,6 +623,7 @@ body{
             scale(0);
 
     }
+
 }
 
 
@@ -1050,7 +1051,7 @@ body{
     ================================================= -->
 
     <div id="loadingStatus">
-        🖼️ Đang chuẩn bị hình ảnh...
+        🖼️ Đang chuẩn bị hình ảnh và âm thanh...
     </div>
 
 
@@ -1072,7 +1073,7 @@ body{
 
 
 <!-- =====================================================
-     GAME
+   GAME
 ===================================================== -->
 
 <div id="gameArea">
@@ -1434,12 +1435,6 @@ document
 
 /*
     Lưu đường dẫn ảnh đã tìm thấy.
-
-    Ví dụ:
-
-    imageSources["doctor"]
-    =
-    "flashcard/doctor.png"
 */
 
 const imageSources = {};
@@ -1506,14 +1501,6 @@ function preloadOneImage(word){
                 img.onload =
                     function(){
 
-                        /*
-                            Giữ chính Image object
-                            trong bộ nhớ.
-
-                            Điều này giúp trình duyệt
-                            đã decode ảnh trước khi chơi.
-                        */
-
                         imgSources[word] =
                             img;
 
@@ -1551,24 +1538,133 @@ function preloadOneImage(word){
 }
 
 
-/*
-    Tải toàn bộ ảnh.
+/* =====================================================
+   IMAGE CACHE
+===================================================== */
 
-    Tất cả ảnh được tải song song.
+const imgSources = {};
+
+
+/* =====================================================
+   AUDIO CACHE
+===================================================== */
+
+
+/*
+    Lưu Audio object đã preload.
+
+    Ví dụ:
+
+    audioSources["doctor"]
+
+    sẽ chứa file:
+
+    recording/doctor.mp3
 */
 
-async function preloadAllImages(){
+const audioSources = {};
 
-    const total =
+
+/*
+    Tải trước một file MP3.
+
+    Chỉ cần tải đúng file .mp3.
+*/
+
+function preloadOneAudio(word){
+
+    return new Promise(
+        resolve => {
+
+            const audio =
+                new Audio();
+
+
+            audio.preload =
+                "auto";
+
+
+            audio.oncanplaythrough =
+                function(){
+
+                    audioSources[word] =
+                        audio;
+
+
+                    resolve(true);
+
+                };
+
+
+            audio.onerror =
+                function(){
+
+                    resolve(false);
+
+                };
+
+
+            audio.src =
+                RECORDING_FOLDER +
+                word +
+                ".mp3";
+
+
+            audio.load();
+
+        }
+    );
+
+}
+
+
+/* =====================================================
+   PRELOAD IMAGES + AUDIO
+===================================================== */
+
+
+/*
+    Tải toàn bộ:
+
+    14 hình ảnh
+    +
+    14 recording
+
+    Tổng cộng 28 tài nguyên.
+
+    Loading bar chạy theo tổng số
+    tài nguyên đã hoàn thành.
+*/
+
+async function preloadAllAssets(){
+
+    const totalImages =
         juniorword.length;
+
+
+    const totalAudio =
+        juniorword.length;
+
+
+    const totalAssets =
+        totalImages +
+        totalAudio;
 
 
     let completed =
         0;
 
 
+    let loadedImages =
+        0;
+
+
+    let loadedAudio =
+        0;
+
+
     loadingStatus.textContent =
-        `🖼️ Đang tải hình ảnh... 0/${total}`;
+        `🖼️🔊 Đang tải... 0/${totalAssets}`;
 
 
     loadingProgress.style.width =
@@ -1576,11 +1672,12 @@ async function preloadAllImages(){
 
 
     /*
-        Tạo promise riêng để cập nhật
-        tiến trình ngay khi từng ảnh xong.
+        -------------------------------------------------
+        PRELOAD IMAGES
+        -------------------------------------------------
     */
 
-    const promises =
+    const imagePromises =
         juniorword.map(
             async word => {
 
@@ -1590,12 +1687,19 @@ async function preloadAllImages(){
                     );
 
 
+                if(result){
+
+                    loadedImages++;
+
+                }
+
+
                 completed++;
 
 
                 const percent =
                     completed /
-                    total *
+                    totalAssets *
                     100;
 
 
@@ -1604,7 +1708,7 @@ async function preloadAllImages(){
 
 
                 loadingStatus.textContent =
-                    `🖼️ Đang tải hình ảnh... ${completed}/${total}`;
+                    `🖼️🔊 Đang tải... ${completed}/${totalAssets}`;
 
 
                 return result;
@@ -1613,20 +1717,77 @@ async function preloadAllImages(){
         );
 
 
-    const results =
-        await Promise.all(
-            promises
+    /*
+        -------------------------------------------------
+        PRELOAD AUDIO
+        -------------------------------------------------
+    */
+
+    const audioPromises =
+        juniorword.map(
+            async word => {
+
+                const result =
+                    await preloadOneAudio(
+                        word
+                    );
+
+
+                if(result){
+
+                    loadedAudio++;
+
+                }
+
+
+                completed++;
+
+
+                const percent =
+                    completed /
+                    totalAssets *
+                    100;
+
+
+                loadingProgress.style.width =
+                    percent + "%";
+
+
+                loadingStatus.textContent =
+                    `🖼️🔊 Đang tải... ${completed}/${totalAssets}`;
+
+
+                return result;
+
+            }
         );
 
 
-    const loaded =
-        results.filter(
-            result => result
-        ).length;
+    /*
+        Chờ cả ảnh và audio.
+    */
 
+    const imageResults =
+        await Promise.all(
+            imagePromises
+        );
+
+
+    const audioResults =
+        await Promise.all(
+            audioPromises
+        );
+
+
+    /*
+        -------------------------------------------------
+        KIỂM TRA
+        -------------------------------------------------
+    */
 
     if(
-        loaded === total
+        loadedImages === totalImages &&
+        loadedAudio === totalAudio
     ){
 
         loadingProgress.style.width =
@@ -1634,7 +1795,7 @@ async function preloadAllImages(){
 
 
         loadingStatus.textContent =
-            `✅ Đã tải xong ${total}/${total} hình ảnh!`;
+            `✅ Đã tải xong ${totalImages} hình ảnh + ${totalAudio} âm thanh!`;
 
 
         startBtn.disabled =
@@ -1649,7 +1810,7 @@ async function preloadAllImages(){
     else{
 
         loadingStatus.textContent =
-            `⚠️ Chỉ tải được ${loaded}/${total} hình ảnh.`;
+            `⚠️ Hình ảnh: ${loadedImages}/${totalImages} | Âm thanh: ${loadedAudio}/${totalAudio}`;
 
 
         startBtn.disabled =
@@ -1657,32 +1818,11 @@ async function preloadAllImages(){
 
 
         startBtn.textContent =
-            "⚠️ Thiếu hình ảnh";
+            "⚠️ Thiếu dữ liệu";
 
     }
 
 }
-
-
-/* =====================================================
-   IMAGE CACHE
-===================================================== */
-
-
-/*
-    Giữ Image object trong RAM.
-
-    Điều này quan trọng hơn chỉ preload
-    bằng src.
-
-    Sau khi preload:
-
-    imgSources["doctor"]
-
-    chính là Image object đã load.
-*/
-
-const imgSources = {};
 
 
 /* =====================================================
@@ -1820,16 +1960,43 @@ function playWordAudio(word){
     }
 
 
-    wordAudio =
-        new Audio(
-            RECORDING_FOLDER +
-            word +
-            ".mp3"
-        );
+    /*
+        Lấy Audio object đã preload.
+
+        Không tạo request mới.
+    */
+
+    const cachedAudio =
+        audioSources[word];
 
 
-    wordAudio.preload =
-        "auto";
+    if(cachedAudio){
+
+        wordAudio =
+            cachedAudio;
+
+        wordAudio.currentTime =
+            0;
+
+    }
+
+    else{
+
+        /*
+            Fallback nếu preload thất bại.
+        */
+
+        wordAudio =
+            new Audio(
+                RECORDING_FOLDER +
+                word +
+                ".mp3"
+            );
+
+        wordAudio.preload =
+            "auto";
+
+    }
 
 
     wordAudio.play().catch(
@@ -1897,9 +2064,6 @@ function createRound(){
 
     /*
         Lấy từ tiếp theo.
-
-        Mỗi từ chỉ xuất hiện 1 lần
-        làm đáp án.
     */
 
     currentTarget =
@@ -1919,7 +2083,7 @@ function createRound(){
 
 
     /*
-        Phát recording.
+        Phát recording đã preload.
     */
 
     playWordAudio(
@@ -1952,13 +2116,6 @@ function createRound(){
             )
         ];
 
-
-    /*
-        Set chống trùng.
-
-        Vì có 14 từ và chỉ lấy 3
-        nên luôn đủ từ khác nhau.
-    */
 
     const usedWords =
         new Set();
@@ -2069,9 +2226,6 @@ function showMole(
 
     /*
         Lấy Image object đã preload.
-
-        Đây là điểm quan trọng giúp
-        ảnh hiện gần như ngay lập tức.
     */
 
     const cachedImage =
@@ -2081,12 +2235,6 @@ function showMole(
     if(
         cachedImage
     ){
-
-        /*
-            Clone Image object.
-
-            Không cần tải lại từ server.
-        */
 
         const img =
             cachedImage.cloneNode(
@@ -2112,10 +2260,6 @@ function showMole(
     }
 
     else{
-
-        /*
-            Fallback nếu có lỗi.
-        */
 
         const imageSrc =
             imageSources[word];
@@ -2275,10 +2419,6 @@ function hitTimeUp(){
     }
 
 
-    /*
-        Hết lượt.
-    */
-
     roundFinished =
         true;
 
@@ -2305,10 +2445,6 @@ function hitTimeUp(){
         "#fef08a";
 
 
-    /*
-        Ẩn tất cả chuột.
-    */
-
     activeHoles.forEach(
         index => {
 
@@ -2317,10 +2453,6 @@ function hitTimeUp(){
         }
     );
 
-
-    /*
-        Chờ recording xong.
-    */
 
     waitForAudioThenNextRound();
 
@@ -2337,11 +2469,6 @@ function waitForAudioThenNextRound(){
         return;
 
 
-    /*
-        Nếu audio không tồn tại
-        hoặc đã phát xong.
-    */
-
     if(
         !wordAudio ||
         wordAudio.ended
@@ -2353,10 +2480,6 @@ function waitForAudioThenNextRound(){
 
     }
 
-
-    /*
-        Chờ audio kết thúc.
-    */
 
     wordAudio.addEventListener(
         "ended",
@@ -2421,14 +2544,7 @@ function hitMole(event){
 
 
     /*
-        QUAN TRỌNG NHẤT:
-
-        Nếu lượt này đã được đập
-        rồi thì không cho đập nữa.
-
-        Áp dụng cho cả:
-        - đúng
-        - sai
+        Mỗi round chỉ được đập 1 lần.
     */
 
     if(roundFinished)
@@ -2438,10 +2554,6 @@ function hitMole(event){
     const hole =
         event.currentTarget;
 
-
-    /*
-        Không có chuột.
-    */
 
     if(
         !hole.classList.contains(
@@ -2453,10 +2565,6 @@ function hitMole(event){
 
     }
 
-
-    /*
-        Chuột này đã bị đập.
-    */
 
     if(
         hole.dataset.hit ===
@@ -2478,17 +2586,9 @@ function hitMole(event){
         holeWords[index];
 
 
-    /*
-        Đánh dấu chuột đã bị đập.
-    */
-
     hole.dataset.hit =
         "true";
 
-
-    /*
-        HIỆN BÚA.
-    */
 
     showHammer(
         event.clientX,
@@ -2504,20 +2604,9 @@ function hitMole(event){
         word === currentTarget
     ){
 
-        /*
-            Khóa lượt ngay lập tức.
-
-            Người chơi không thể đập
-            chuột khác.
-        */
-
         roundFinished =
             true;
 
-
-        /*
-            +1 điểm.
-        */
 
         score++;
 
@@ -2533,18 +2622,10 @@ function hitMole(event){
             "#bbf7d0";
 
 
-        /*
-            Âm thanh đúng.
-        */
-
         playSound(
             "correct"
         );
 
-
-        /*
-            Dừng timer.
-        */
 
         clearTimeout(
             roundTimer
@@ -2560,19 +2641,10 @@ function hitMole(event){
             "0%";
 
 
-        /*
-            Hiệu ứng chuột đúng.
-        */
-
         hole.classList.add(
             "hit"
         );
 
-
-        /*
-            Sau hiệu ứng:
-            ẩn tất cả chuột.
-        */
 
         setTimeout(
             () => {
@@ -2591,10 +2663,6 @@ function hitMole(event){
             180
         );
 
-
-        /*
-            Chờ recording xong.
-        */
 
         waitForAudioThenNextRound();
 
@@ -2607,23 +2675,9 @@ function hitMole(event){
 
     else{
 
-        /*
-            =================================================
-            QUAN TRỌNG:
-
-            ĐẬP SAI = KHÓA NGAY LẬP TỨC.
-
-            Không được đập tiếp chuột nào khác.
-        =================================================
-        */
-
         roundFinished =
             true;
 
-
-        /*
-            Dừng timer.
-        */
 
         clearTimeout(
             roundTimer
@@ -2639,10 +2693,6 @@ function hitMole(event){
             "0%";
 
 
-        /*
-            Thông báo.
-        */
-
         messageEl.textContent =
             "❌ Sai rồi!";
 
@@ -2651,29 +2701,15 @@ function hitMole(event){
             "#fecaca";
 
 
-        /*
-            Âm thanh sai.
-        */
-
         playSound(
             "wrong"
         );
 
 
-        /*
-            Hiệu ứng chuột sai.
-        */
-
         hole.classList.add(
             "hit"
         );
 
-
-        /*
-            Ẩn TẤT CẢ chuột.
-
-            Không chỉ chuột sai.
-        */
 
         setTimeout(
             () => {
@@ -2692,11 +2728,6 @@ function hitMole(event){
             180
         );
 
-
-        /*
-            Chờ recording xong rồi
-            chuyển sang lượt tiếp theo.
-        */
 
         waitForAudioThenNextRound();
 
@@ -2784,11 +2815,6 @@ function playSound(type){
         }
 
 
-        /*
-            Một số điện thoại cần resume
-            AudioContext sau user interaction.
-        */
-
         if(
             audioContext.state ===
             "suspended"
@@ -2816,10 +2842,6 @@ function playSound(type){
             audioContext.destination
         );
 
-
-        /* =================================================
-           CORRECT
-        ================================================= */
 
         if(
             type === "correct"
@@ -2864,10 +2886,6 @@ function playSound(type){
         }
 
 
-        /* =================================================
-           WRONG
-        ================================================= */
-
         else{
 
             osc.type =
@@ -2907,11 +2925,6 @@ startBtn.addEventListener(
     "click",
     () => {
 
-        /*
-            Không cho bắt đầu nếu
-            ảnh chưa tải xong.
-        */
-
         if(
             startBtn.disabled
         ){
@@ -2940,12 +2953,6 @@ startBtn.addEventListener(
             name;
 
 
-        /*
-            Xáo trộn toàn bộ từ.
-
-            Mỗi từ chỉ làm đáp án 1 lần.
-        */
-
         remainingWords =
             shuffle(
                 [...juniorword]
@@ -2971,10 +2978,6 @@ startBtn.addEventListener(
         roundFinished =
             false;
 
-
-        /*
-            Dừng audio cũ.
-        */
 
         if(wordAudio){
 
@@ -3030,10 +3033,6 @@ function endGame(){
     );
 
 
-    /*
-        Dừng recording.
-    */
-
     if(wordAudio){
 
         wordAudio.pause();
@@ -3043,10 +3042,6 @@ function endGame(){
 
     }
 
-
-    /*
-        Ẩn chuột.
-    */
 
     for(
         let i = 0;
@@ -3106,10 +3101,6 @@ playAgainBtn.addEventListener(
             "flex";
 
 
-        /*
-            Giữ tên học sinh.
-        */
-
         nameInput.value =
             studentName;
 
@@ -3123,13 +3114,13 @@ playAgainBtn.addEventListener(
 
 
         /*
-            Không preload lại ảnh.
+            Không preload lại.
 
-            Ảnh đã nằm trong cache.
+            Ảnh + audio đã được preload.
         */
 
         loadingStatus.textContent =
-            `✅ Đã tải xong ${juniorword.length}/${juniorword.length} hình ảnh!`;
+            `✅ Đã tải xong ${juniorword.length} hình ảnh + ${juniorword.length} âm thanh!`;
 
 
         loadingProgress.style.width =
@@ -3328,10 +3319,15 @@ document.addEventListener(
 
 
         /*
-            Bắt đầu preload toàn bộ ảnh.
+            Bắt đầu preload:
+
+            - 14 ảnh
+            - 14 recording
+
+            KHÔNG preload background music.
         */
 
-        preloadAllImages();
+        preloadAllAssets();
 
     }
 );
